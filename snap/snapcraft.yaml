@@ -50,8 +50,6 @@ apps:
       # The host's /etc/gitconfig cannot be read under confinement.
       GIT_CONFIG_NOSYSTEM: '1'
       GIT_EXEC_PATH: $SNAP/usr/lib/git-core
-      # Git reads XDG_CONFIG_HOME/git; a session-wide value would select the
-      # host's hidden ~/.config.
       XDG_CONFIG_HOME: $SNAP_USER_DATA/.config
     plugs:
       - home
@@ -69,24 +67,19 @@ parts:
       - CGO_ENABLED: '0'
       - GOTOOLCHAIN: local
     override-build: |
-      # A HEAD build has the version git-<commit>, which Gitleaks cannot compare
-      # with the minVersion of its configuration: it stays a development build.
+      # Gitleaks cannot compare a git-<commit> version with its config's minVersion.
       case "$SNAPCRAFT_PROJECT_VERSION" in
         git-*) version_flag= ;;
         *) version_flag="-X=github.com/zricethezav/gitleaks/v8/version.Version=$SNAPCRAFT_PROJECT_VERSION" ;;
       esac
-      # Upstream's default regex engine. Its release binaries add the gore2regex
-      # tag, which scans large histories faster but starts about 0.4 s slower.
+      # No gore2regex tag: upstream's release binaries start about 0.4 s slower with it.
       go build -p "$CRAFT_PARALLEL_BUILD_COUNT" -trimpath \
         -ldflags "-s -w $version_flag" -o "$CRAFT_PART_INSTALL/bin/gitleaks" .
-      # The generated script calls old bash-completion helper names, which a snap
-      # only gets from the host's /etc. The prepended file defines them when missing.
       completion="$CRAFT_PART_INSTALL/share/bash-completion/completions/gitleaks"
       install -Dm644 "$CRAFT_PROJECT_DIR/snap/local/completion-compat.bash" "$completion"
       "$CRAFT_PART_INSTALL/bin/gitleaks" completion bash >> "$completion"
       install -Dm644 LICENSE -t "$CRAFT_PART_INSTALL/share/doc/gitleaks"
 
-  # Gitleaks reads history and staged changes with git log, diff and cat-file.
   git:
     plugin: nil
     stage-slices:
