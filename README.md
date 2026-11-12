@@ -30,54 +30,12 @@ cd ~/my-project
 gitleaks git -v
 ```
 
-Replace `~/my-project` with a Git repository. `gitleaks git` scans its history, `gitleaks dir` scans files as they are on disk, and `gitleaks stdin` scans piped text:
-
-```bash
-gitleaks dir -v ~/my-project
-cat notes.txt | gitleaks stdin -v
-gitleaks git --report-path gitleaks-report.json
-```
-
-Bash completion is included.
-
-To check staged changes before each commit, save this as `.git/hooks/pre-commit` in the repository and make it executable:
-
-```sh
-#!/bin/sh
-exec /snap/bin/gitleaks git --pre-commit --staged --redact --verbose
-```
-
-With the [pre-commit](https://pre-commit.com) framework, add a local hook to `.pre-commit-config.yaml`:
-
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: gitleaks
-        name: Detect hardcoded secrets
-        entry: gitleaks git --pre-commit --staged --redact --verbose
-        language: system
-        pass_filenames: false
-```
-
-Upstream's `gitleaks-system` hook also runs this snap, but only scans correctly with `pass_filenames: false` added. The `gitleaks` and `gitleaks-docker` hooks build or pull their own copy.
-
 ## Configure
 
-This snap has no `snap set` options, and Gitleaks keeps no settings or data of its own. It takes its rules from the first of these sources that is present, and from its built-in rules otherwise:
+This snap has no `snap set` options, and Gitleaks keeps no data of its own.
+The Git included in the snap reads its configuration from `~/snap/gitleaks/current`, not from your own `~/.gitconfig`.
 
-| Source | Value |
-| --- | --- |
-| `--config` | Path of a TOML file |
-| `GITLEAKS_CONFIG` | Path of a TOML file |
-| `GITLEAKS_CONFIG_TOML` | Content of a TOML file |
-| `.gitleaks.toml` | File in the scanned folder |
-
-A `.gitleaksignore` file in the scanned folder lists findings to skip, and `--baseline-path` takes an earlier JSON report. `--report-path` writes a report whose format follows the file extension (`.json`, `.csv`, `.sarif`) or `--report-format`.
-
-The included Git reads `~/snap/gitleaks/current/.gitconfig` and the folder `~/snap/gitleaks/current/.config/git`, also when `XDG_CONFIG_HOME` is set in your session. It does not use your own `~/.gitconfig`, `~/.config/git` or `/etc/gitconfig`.
-
-Optional access to repositories and files under `/media` or `/mnt`:
+For repositories under `/media` or `/mnt`:
 
 ```bash
 sudo snap connect gitleaks:removable-media
@@ -85,12 +43,9 @@ sudo snap connect gitleaks:removable-media
 
 ## Limitations
 
-- Repositories, files, configurations and reports must be in a normal folder under your home directory or on connected removable storage. Hidden folders directly under your home directory and system paths such as `/opt` are not accessible. Hidden files inside a project, such as `.env`, are scanned.
-- `/tmp` is private to the snap: files in the host's `/tmp` are not found, and a report written there is not visible outside.
-- Read the log, not only the exit code. A folder the snap cannot read, or an error from Git, can end with a `permission denied` warning or an `ERR [git]` line followed by `no leaks found` and exit code 0.
-- Git runs inside the snap, without the programs a repository's Git configuration may call, such as a `sops` textconv driver or the Git LFS filter. For textconv drivers, scan with `--log-opts="--all --no-textconv"`.
-- Run Gitleaks as the owner of the files. With `sudo` it cannot read other users' home folders.
-- The snap has no network access, so `--diagnostics http` cannot start its profiling server. `--diagnostics cpu,mem,trace` with `--diagnostics-dir` works.
+- Repositories, files and reports must be in a normal folder under your home directory or on connected removable storage. Hidden folders directly under your home directory are not accessible, but hidden files inside a project, such as `.env`, are scanned.
+- Check the log as well as the exit code: an unreadable folder or a Git error can still end with `no leaks found`.
+- Git cannot run host programs that a repository's configuration calls, such as a textconv driver or the Git LFS filter.
 
 ## Build
 
